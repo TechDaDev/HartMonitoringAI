@@ -1,0 +1,43 @@
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+from sklearn.metrics import confusion_matrix
+from sklearn.preprocessing import StandardScaler
+import os
+
+def relabel(y):
+    return np.where(y == 0, 0, 1)
+
+def normalize_per_sample(X):
+    X_norm = np.zeros_like(X, dtype=np.float32)
+    for i in range(X.shape[0]):
+        row = X[i, :].reshape(-1, 1)
+        scaler = StandardScaler()
+        X_norm[i, :] = scaler.fit_transform(row).ravel()
+    return X_norm
+
+def main():
+    test_path = "./data/mitbih_test.csv"
+    test_df = pd.read_csv(test_path, header=None)
+    X_test = test_df.iloc[:, :-1].values
+    y_test = relabel(test_df.iloc[:, -1].values)
+    X_test_cnn = normalize_per_sample(X_test)[..., np.newaxis]
+
+    model = tf.keras.models.load_model("mitbih_residual_cnn.h5")
+    y_probs = model.predict(X_test_cnn)
+    
+    print("\n--- Clinical Metrics Analysis ---")
+    for t in [0.2, 0.3, 0.4, 0.5]:
+        y_pred = (y_probs > t).astype(int)
+        cm = confusion_matrix(y_test, y_pred)
+        TN, FP, FN, TP = cm.ravel()
+        
+        sens = TP / (TP + FN)
+        spec = TN / (TN + FP)
+        
+        print(f"Threshold {t:.1f} | Sensitivity: {sens:.4f} | Specificity: {spec:.4f} | FN: {FN} | FP: {FP}")
+
+    print("\nAnalysis Complete.")
+
+if __name__ == "__main__":
+    main()
