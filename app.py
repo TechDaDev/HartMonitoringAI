@@ -1,10 +1,13 @@
+import os
+# Fix for "TypeError: Descriptors cannot be created directly" on Streamlit Cloud
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+
 import streamlit as st
 import numpy as np
 import time
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from collections import deque
-import os
 import base64
 import io
 import wave

@@ -3,4 +3,5 @@ numpy
 matplotlib
 scikit-learn
 tensorflow-cpu
-streamlit
+streamlit>=1.40.0
+protobuf
