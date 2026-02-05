@@ -484,6 +484,21 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
+# --- SESSION STATE ---
+if 'beat_log' not in st.session_state:
+    st.session_state.beat_log = []
+
+def add_to_log(bpm, status, confidence):
+    entry = {
+        "timestamp": time.strftime("%H:%M:%S"),
+        "bpm": bpm,
+        "status": status,
+        "confidence": f"{confidence:.1%}"
+    }
+    st.session_state.beat_log.insert(0, entry)  # Prepend latest
+    if len(st.session_state.beat_log) > 100:  # Limit history
+        st.session_state.beat_log.pop()
+
 # --- ASSET LOADING ---
 @st.cache_resource
 def load_model():
@@ -547,6 +562,25 @@ with sidebar_col:
     hr_placeholder = st.empty()
     prob_placeholder = st.empty()
     status_placeholder = st.empty()
+    
+    st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
+    
+    # Export Section
+    if st.button("🗑️ CLEAR HISTORY"):
+        st.session_state.beat_log = []
+        st.rerun()
+
+    if st.session_state.beat_log:
+        import pandas as pd
+        df = pd.DataFrame(st.session_state.beat_log)
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 EXPORT SESSION",
+            csv,
+            f"cardiac_log_{time.strftime('%Y%m%d_%H%M%S')}.csv",
+            "text/csv",
+            help="Download all recorded beat data as CSV"
+        )
 
 with main_col:
     # ECG Display Header
@@ -566,6 +600,9 @@ with main_col:
     
     plot_placeholder = st.empty()
     beep_trigger = st.empty()
+    
+    st.markdown('<div class="config-title">CLINICAL AUDIT TRAIL</div>', unsafe_allow_html=True)
+    log_placeholder = st.empty()
 
 # --- MONITORING LOOP ---
 if run and model:
@@ -601,6 +638,10 @@ if run and model:
             sound_data = ABNORMAL_BEEP_B64 if last_det else NORMAL_BEEP_B64
             with beep_trigger:
                 components.html(f"<script>window.parent.playPythonBeep('{sound_data}');</script>", height=0, width=0)
+            
+            # Record Beat in Log
+            status_text = "⚠️ ABNORMAL" if last_det else "✅ NORMAL"
+            add_to_log(calculated_hr, status_text, last_prob)
         
         last_phase = phase
         counter += 1
@@ -689,6 +730,12 @@ if run and model:
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
+            # 3. Update Audit Trail Table
+            if st.session_state.beat_log:
+                import pandas as pd
+                log_df = pd.DataFrame(st.session_state.beat_log).head(8) # Show last 8 in UI
+                log_placeholder.table(log_df)
 
         t += dt
         time.sleep(0.005)
